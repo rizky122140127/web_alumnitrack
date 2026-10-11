@@ -1,5 +1,17 @@
 import React from 'react';
 import { NavLink } from 'react-router-dom';
+import {
+  BookOpen,
+  BriefcaseBusiness,
+  ChartNoAxesCombined,
+  GraduationCap,
+  MessageSquareText,
+  CalendarDays,
+  ShieldCheck,
+  UserRound,
+  UserRoundCheck,
+  UsersRound,
+} from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 
 const Sidebar = ({ isOpen, onClose }) => {
@@ -14,8 +26,7 @@ const Sidebar = ({ isOpen, onClose }) => {
           style={{
             position: 'fixed',
             inset: 0,
-            background: 'rgba(0, 0, 0, 0.65)',
-            backdropFilter: 'blur(4px)',
+            background: 'rgba(24, 34, 30, 0.32)',
             zIndex: 35,
           }}
         />
@@ -23,7 +34,9 @@ const Sidebar = ({ isOpen, onClose }) => {
 
       <aside className={`app-sidebar ${isOpen ? 'open' : ''}`}>
         <div className="sidebar-brand">
-          <div className="sidebar-brand-icon">🎓</div>
+          <div className="sidebar-brand-icon">
+            <img src="/logo-sman1-talang-padang.png" alt="Logo SMAN 1 Talang Padang" />
+          </div>
           <div className="sidebar-brand-text">
             <h2>AlumniTracker</h2>
             <span>SMAN 1 Talang Padang</span>
@@ -33,13 +46,13 @@ const Sidebar = ({ isOpen, onClose }) => {
         <nav className="sidebar-nav">
           {isAdmin ? (
             <>
-              <div className="sidebar-section-title">ADMINISTRASI BK</div>
+              <div className="sidebar-section-title">ADMINISTRASI</div>
               <NavLink
                 to="/admin/dashboard"
                 onClick={onClose}
                 className={({ isActive }) => `sidebar-link ${isActive ? 'active' : ''}`}
               >
-                <span className="link-icon">📊</span>
+                <ChartNoAxesCombined className="link-icon" size={18} strokeWidth={1.8} />
                 <span>Dashboard Analitik</span>
               </NavLink>
               <NavLink
@@ -47,15 +60,23 @@ const Sidebar = ({ isOpen, onClose }) => {
                 onClick={onClose}
                 className={({ isActive }) => `sidebar-link ${isActive ? 'active' : ''}`}
               >
-                <span className="link-icon">👥</span>
+                <UsersRound className="link-icon" size={18} strokeWidth={1.8} />
                 <span>Direktori Alumni</span>
+              </NavLink>
+              <NavLink
+                to="/admin/registrations"
+                onClick={onClose}
+                className={({ isActive }) => `sidebar-link ${isActive ? 'active' : ''}`}
+              >
+                <UserRoundCheck className="link-icon" size={18} strokeWidth={1.8} />
+                <span>Verifikasi Pendaftaran</span>
               </NavLink>
               <NavLink
                 to="/admin/tracer-questions"
                 onClick={onClose}
                 className={({ isActive }) => `sidebar-link ${isActive ? 'active' : ''}`}
               >
-                <span className="link-icon">📋</span>
+                <BookOpen className="link-icon" size={18} strokeWidth={1.8} />
                 <span>Kelola Tracer Study</span>
               </NavLink>
               <NavLink
@@ -63,7 +84,7 @@ const Sidebar = ({ isOpen, onClose }) => {
                 onClick={onClose}
                 className={({ isActive }) => `sidebar-link ${isActive ? 'active' : ''}`}
               >
-                <span className="link-icon">📈</span>
+                <ChartNoAxesCombined className="link-icon" size={18} strokeWidth={1.8} />
                 <span>Rekapitulasi Akreditasi</span>
               </NavLink>
               <NavLink
@@ -71,16 +92,32 @@ const Sidebar = ({ isOpen, onClose }) => {
                 onClick={onClose}
                 className={({ isActive }) => `sidebar-link ${isActive ? 'active' : ''}`}
               >
-                <span className="link-icon">💼</span>
-                <span>Moderasi Lowongan</span>
+                <BriefcaseBusiness className="link-icon" size={18} strokeWidth={1.8} />
+                <span>Lowongan & Beasiswa</span>
+              </NavLink>
+              <NavLink
+                to="/admin/events"
+                onClick={onClose}
+                className={({ isActive }) => `sidebar-link ${isActive ? 'active' : ''}`}
+              >
+                <CalendarDays className="link-icon" size={18} strokeWidth={1.8} />
+                <span>Event Sekolah & Alumni</span>
               </NavLink>
               <NavLink
                 to="/admin/notifications"
                 onClick={onClose}
                 className={({ isActive }) => `sidebar-link ${isActive ? 'active' : ''}`}
               >
-                <span className="link-icon">💬</span>
+                <MessageSquareText className="link-icon" size={18} strokeWidth={1.8} />
                 <span>WA Gateway Log</span>
+              </NavLink>
+              <NavLink
+                to="/admin/users"
+                onClick={onClose}
+                className={({ isActive }) => `sidebar-link ${isActive ? 'active' : ''}`}
+              >
+                <ShieldCheck className="link-icon" size={18} strokeWidth={1.8} />
+                <span>Pengelola Admin</span>
               </NavLink>
             </>
           ) : (
@@ -91,7 +128,7 @@ const Sidebar = ({ isOpen, onClose }) => {
                 onClick={onClose}
                 className={({ isActive }) => `sidebar-link ${isActive ? 'active' : ''}`}
               >
-                <span className="link-icon">🏠</span>
+                <GraduationCap className="link-icon" size={18} strokeWidth={1.8} />
                 <span>Beranda</span>
               </NavLink>
               <NavLink
@@ -99,7 +136,7 @@ const Sidebar = ({ isOpen, onClose }) => {
                 onClick={onClose}
                 className={({ isActive }) => `sidebar-link ${isActive ? 'active' : ''}`}
               >
-                <span className="link-icon">✍️</span>
+                <BookOpen className="link-icon" size={18} strokeWidth={1.8} />
                 <span>Kuesioner Tracer</span>
               </NavLink>
               <NavLink
@@ -107,15 +144,23 @@ const Sidebar = ({ isOpen, onClose }) => {
                 onClick={onClose}
                 className={({ isActive }) => `sidebar-link ${isActive ? 'active' : ''}`}
               >
-                <span className="link-icon">💼</span>
+                <BriefcaseBusiness className="link-icon" size={18} strokeWidth={1.8} />
                 <span>Lowongan & Beasiswa</span>
+              </NavLink>
+              <NavLink
+                to="/alumni/events"
+                onClick={onClose}
+                className={({ isActive }) => `sidebar-link ${isActive ? 'active' : ''}`}
+              >
+                <CalendarDays className="link-icon" size={18} strokeWidth={1.8} />
+                <span>Event Sekolah & Alumni</span>
               </NavLink>
               <NavLink
                 to="/alumni/profile"
                 onClick={onClose}
                 className={({ isActive }) => `sidebar-link ${isActive ? 'active' : ''}`}
               >
-                <span className="link-icon">👤</span>
+                <UserRound className="link-icon" size={18} strokeWidth={1.8} />
                 <span>Profil Saya</span>
               </NavLink>
             </>

@@ -10,6 +10,11 @@ use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Laravel\Sanctum\HasApiTokens;
 
+/**
+ * @property int $id
+ * @property string $role
+ * @property string $alumni_approval_status
+ */
 class User extends Authenticatable
 {
     /** @use HasFactory<UserFactory> */
@@ -23,9 +28,12 @@ class User extends Authenticatable
     protected $fillable = [
         'name',
         'email',
+        'google_id',
         'phone_number',
+        'nisn',
         'password',
         'role',
+        'alumni_approval_status',
         'is_wa_active',
     ];
 
@@ -58,11 +66,6 @@ class User extends Authenticatable
     public function alumniProfile(): HasOne
     {
         return $this->hasOne(AlumniProfile::class);
-    }
-
-    public function magicLinks(): HasMany
-    {
-        return $this->hasMany(MagicLink::class);
     }
 
     public function tracerAnswers(): HasMany

@@ -15,7 +15,7 @@ const ProfilePage = () => {
     is_wa_active: user?.is_wa_active ?? true,
     // Alumni fields
     graduation_year: profile?.graduation_year || new Date().getFullYear(),
-    nisn: profile?.nisn || '',
+    nisn: user?.nisn || '',
     current_status: profile?.current_status || 'mahasiswa',
     campus_name: profile?.campus_name || '',
     major_name: profile?.major_name || '',
@@ -39,7 +39,7 @@ const ProfilePage = () => {
         phone_number: user.phone_number || '',
         is_wa_active: user.is_wa_active ?? true,
         graduation_year: prof.graduation_year || prev.graduation_year,
-        nisn: prof.nisn || prev.nisn,
+        nisn: user.nisn || prev.nisn,
         current_status: prof.current_status || prev.current_status,
         campus_name: prof.campus_name || '',
         major_name: prof.major_name || '',
@@ -84,9 +84,12 @@ const ProfilePage = () => {
         }
         payload.password = formData.password;
         payload.password_confirmation = formData.password_confirmation;
-        if (formData.current_password) {
-          payload.current_password = formData.current_password;
+        if (!formData.current_password) {
+          toast.error('Masukkan kata sandi saat ini untuk mengubah kata sandi.');
+          setSaving(false);
+          return;
         }
+        payload.current_password = formData.current_password;
       }
 
       await updateProfile(payload);
@@ -134,7 +137,19 @@ const ProfilePage = () => {
             />
           </div>
 
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '1rem' }}>
+            <div className="form-group">
+              <label className="form-label">Kata Sandi Saat Ini</label>
+              <input
+                type="password"
+                name="current_password"
+                className="form-input"
+                placeholder="Wajib jika mengganti kata sandi"
+                value={formData.current_password}
+                onChange={handleChange}
+                autoComplete="current-password"
+              />
+            </div>
             <div className="form-group">
               <label className="form-label">Nomor WhatsApp Aktif</label>
               <input
@@ -330,6 +345,8 @@ const ProfilePage = () => {
                 placeholder="Kosongkan bila tidak diubah"
                 value={formData.password}
                 onChange={handleChange}
+                minLength={8}
+                autoComplete="new-password"
               />
             </div>
 
@@ -342,6 +359,7 @@ const ProfilePage = () => {
                 placeholder="Ulangi kata sandi baru"
                 value={formData.password_confirmation}
                 onChange={handleChange}
+                autoComplete="new-password"
               />
             </div>
           </div>

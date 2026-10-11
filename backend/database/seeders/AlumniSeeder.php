@@ -107,6 +107,7 @@ class AlumniSeeder extends Seeder
                 [
                     'name'         => $data['name'],
                     'phone_number' => $data['phone_number'],
+                    'nisn'         => $data['nisn'],
                     'password'     => Hash::make('alumni123'),
                     'role'         => 'alumni',
                     'is_wa_active' => true,
@@ -116,7 +117,6 @@ class AlumniSeeder extends Seeder
             AlumniProfile::updateOrCreate(
                 ['user_id' => $user->id],
                 [
-                    'nisn'            => $data['nisn'],
                     'graduation_year' => $data['graduation_year'],
                     'current_status'  => $data['current_status'],
                     'campus_name'     => $data['campus_name'] ?? null,

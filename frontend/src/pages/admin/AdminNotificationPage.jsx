@@ -1,9 +1,18 @@
 import React, { useState, useEffect } from 'react';
+import { Send } from 'lucide-react';
 import api from '../../api/axios';
 import { useToast } from '../../contexts/ToastContext';
 import Badge from '../../components/ui/Badge';
 import Modal from '../../components/ui/Modal';
 import Spinner from '../../components/ui/Spinner';
+
+const alumniStatuses = [
+  { value: 'mahasiswa', label: 'Mahasiswa' },
+  { value: 'gap_year', label: 'Gap year' },
+  { value: 'bekerja', label: 'Bekerja' },
+  { value: 'wirausaha', label: 'Wirausaha' },
+  { value: 'belum_kerja', label: 'Belum bekerja' },
+];
 
 const AdminNotificationPage = () => {
   const [notifications, setNotifications] = useState([]);
@@ -14,6 +23,10 @@ const AdminNotificationPage = () => {
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [selectedMessage, setSelectedMessage] = useState(null);
+  const [sendingReminders, setSendingReminders] = useState(false);
+  const [broadcastStatuses, setBroadcastStatuses] = useState([]);
+  const [broadcastMessage, setBroadcastMessage] = useState('');
+  const [sendingBroadcast, setSendingBroadcast] = useState(false);
 
   const toast = useToast();
 
@@ -48,6 +61,69 @@ const AdminNotificationPage = () => {
   useEffect(() => {
     fetchLogs();
   }, [page, statusFilter, typeFilter]);
+
+  const handleSendTracerReminders = async () => {
+    if (!window.confirm('Kirim pengingat tracer study dan tautan akses 24 jam kepada semua alumni yang belum mengisi dan mengaktifkan notifikasi WhatsApp?')) {
+      return;
+    }
+
+    setSendingReminders(true);
+    try {
+      const response = await api.post('/wa-notifications/send-tracer-reminders');
+      toast.success(response.data?.message || 'Pengingat tracer berhasil dimasukkan ke antrean.');
+      await fetchLogs();
+    } catch (error) {
+      toast.error(error.response?.data?.message || 'Gagal mengirim pengingat tracer WhatsApp.');
+    } finally {
+      setSendingReminders(false);
+    }
+  };
+
+  const toggleBroadcastStatus = (status) => {
+    setBroadcastStatuses((current) => (
+      current.includes(status)
+        ? current.filter((value) => value !== status)
+        : [...current, status]
+    ));
+  };
+
+  const handleSendTargetedBroadcast = async (event) => {
+    event.preventDefault();
+    if (broadcastStatuses.length === 0) {
+      toast.warning('Pilih minimal satu status alumni sebagai penerima.');
+      return;
+    }
+
+    if (!broadcastMessage.trim()) {
+      toast.warning('Isi pesan notifikasi terlebih dahulu.');
+      return;
+    }
+
+    const recipientLabels = alumniStatuses
+      .filter(({ value }) => broadcastStatuses.includes(value))
+      .map(({ label }) => label)
+      .join(', ');
+
+    if (!window.confirm(`Kirim pesan kepada alumni approved yang mengaktifkan WA dengan status: ${recipientLabels}?`)) {
+      return;
+    }
+
+    setSendingBroadcast(true);
+    try {
+      const response = await api.post('/wa-notifications/send-targeted', {
+        statuses: broadcastStatuses,
+        message: broadcastMessage.trim(),
+      });
+      toast.success(response.data?.message || 'Notifikasi berhasil dimasukkan ke antrean.');
+      setBroadcastMessage('');
+      setPage(1);
+      await fetchLogs();
+    } catch (error) {
+      toast.error(error.response?.data?.message || 'Gagal mengirim notifikasi terarah.');
+    } finally {
+      setSendingBroadcast(false);
+    }
+  };
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
@@ -86,12 +162,86 @@ const AdminNotificationPage = () => {
               style={{ width: '180px' }}
             >
               <option value="">Semua Tipe</option>
-              <option value="targeted_push">Targeted Push Karir</option>
+              <option value="targeted_push">Push Karier / Broadcast</option>
               <option value="reminder_tracer">Reminder Tracer</option>
             </select>
           </div>
         </div>
       </div>
+
+      <section className="card" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '1rem', flexWrap: 'wrap' }}>
+        <div>
+          <h2 style={{ fontSize: '1rem', fontWeight: 700, margin: 0 }}>Pengingat tracer study</h2>
+          <p style={{ margin: '0.25rem 0 0', fontSize: '0.85rem' }}>
+            Kirim pengingat tracer kepada alumni yang belum mengisi kuesioner. Pesan berisi tautan login resmi NISN/password.
+          </p>
+        </div>
+        <button type="button" className="btn btn-primary" onClick={handleSendTracerReminders} disabled={sendingReminders}>
+          <Send size={16} />
+          {sendingReminders ? 'Memasukkan ke antrean...' : 'Kirim Pengingat Massal'}
+        </button>
+      </section>
+
+      <form className="card" onSubmit={handleSendTargetedBroadcast}>
+        <div style={{ marginBottom: '1rem' }}>
+          <h2 style={{ fontSize: '1rem', fontWeight: 700, margin: 0 }}>Kirim notifikasi berdasarkan status alumni</h2>
+          <p style={{ margin: '0.25rem 0 0', fontSize: '0.85rem' }}>
+            Penerima hanya alumni yang sudah disetujui dan mengaktifkan notifikasi WhatsApp.
+          </p>
+        </div>
+
+        <fieldset style={{ border: 0, padding: 0, margin: '0 0 1rem' }}>
+          <legend className="form-label">Status penerima</legend>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: '0.65rem' }}>
+            {alumniStatuses.map(({ value, label }) => (
+              <label
+                key={value}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.55rem',
+                  padding: '0.65rem 0.75rem',
+                  border: '1px solid var(--color-border)',
+                  borderRadius: 'var(--radius-md)',
+                  cursor: 'pointer',
+                }}
+              >
+                <input
+                  type="checkbox"
+                  value={value}
+                  checked={broadcastStatuses.includes(value)}
+                  onChange={() => toggleBroadcastStatus(value)}
+                />
+                <span>{label}</span>
+              </label>
+            ))}
+          </div>
+        </fieldset>
+
+        <label className="form-label" htmlFor="targeted-broadcast-message">Isi pesan</label>
+        <textarea
+          id="targeted-broadcast-message"
+          className="form-input form-textarea"
+          value={broadcastMessage}
+          onChange={(event) => setBroadcastMessage(event.target.value)}
+          maxLength={4096}
+          placeholder="Tulis informasi atau pengumuman untuk alumni yang dipilih..."
+          required
+        />
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '1rem', marginTop: '0.75rem', flexWrap: 'wrap' }}>
+          <span style={{ fontSize: '0.8rem', color: 'var(--color-text-secondary)' }}>
+            {broadcastMessage.length}/4096 karakter
+          </span>
+          <button
+            type="submit"
+            className="btn btn-primary"
+            disabled={sendingBroadcast || broadcastStatuses.length === 0 || !broadcastMessage.trim()}
+          >
+            <Send size={16} />
+            {sendingBroadcast ? 'Memasukkan ke antrean...' : 'Kirim ke Status Terpilih'}
+          </button>
+        </div>
+      </form>
 
       {/* Stats Cards */}
       <div className="stats-grid">
@@ -170,7 +320,9 @@ const AdminNotificationPage = () => {
                     </td>
                     <td>
                       <span style={{ fontSize: '0.8rem', color: '#cbd5e1' }}>
-                        {item.notification_type === 'targeted_push' ? '📢 Push Karir' : '⏰ Reminder'}
+                        {item.notification_type === 'targeted_push'
+                          ? item.career_post?.title ? '📢 Push Karier' : '📣 Broadcast Admin'
+                          : '⏰ Reminder'}
                       </span>
                     </td>
                     <td>

@@ -6,32 +6,37 @@ import Spinner from './components/ui/Spinner';
 
 // Auth Pages
 import LoginPage from './pages/auth/LoginPage';
+import AdminLoginPage from './pages/auth/AdminLoginPage';
 import RegisterPage from './pages/auth/RegisterPage';
-import MagicLinkVerifyPage from './pages/auth/MagicLinkVerifyPage';
+import GoogleAuthCallbackPage from './pages/auth/GoogleAuthCallbackPage';
 
 // Alumni Pages
 import AlumniDashboardPage from './pages/alumni/DashboardPage';
 import TracerStudyPage from './pages/alumni/TracerStudyPage';
 import CareerPage from './pages/alumni/CareerPage';
+import EventListPage from './pages/alumni/EventListPage';
 import ProfilePage from './pages/alumni/ProfilePage';
 
 // Admin Pages
 import AdminDashboardPage from './pages/admin/AdminDashboardPage';
 import AdminAlumniPage from './pages/admin/AdminAlumniPage';
+import AdminRegistrationsPage from './pages/admin/AdminRegistrationsPage';
 import AdminTracerPage from './pages/admin/AdminTracerPage';
 import AdminRecapPage from './pages/admin/AdminRecapPage';
 import AdminCareerPage from './pages/admin/AdminCareerPage';
+import AdminEventsPage from './pages/admin/AdminEventsPage';
 import AdminNotificationPage from './pages/admin/AdminNotificationPage';
+import AdminUsersPage from './pages/admin/AdminUsersPage';
 
 // Protected Route wrappers
 const ProtectedRoute = ({ children }) => {
-  const { user, loading } = useAuth();
+  const { user, loading, isAdmin, isAlumni } = useAuth();
 
   if (loading) {
     return <Spinner text="Memuat sesi pengguna..." />;
   }
 
-  if (!user) {
+  if (!user || (!isAdmin && !isAlumni)) {
     return <Navigate to="/auth/login" replace />;
   }
 
@@ -74,10 +79,11 @@ function App() {
   return (
     <Routes>
       {/* Public Auth Routes */}
+      <Route path="/login" element={<LoginPage />} />
       <Route path="/auth/login" element={<LoginPage />} />
+      <Route path="/auth/admin" element={<AdminLoginPage />} />
       <Route path="/auth/register" element={<RegisterPage />} />
-      <Route path="/auth/magic-link" element={<MagicLinkVerifyPage />} />
-      <Route path="/auth/magic-link/:token" element={<MagicLinkVerifyPage />} />
+      <Route path="/auth/google/callback" element={<GoogleAuthCallbackPage />} />
 
       {/* Protected Routes inside AppLayout */}
       <Route
@@ -91,6 +97,7 @@ function App() {
         <Route path="/alumni/dashboard" element={<AlumniDashboardPage />} />
         <Route path="/alumni/tracer" element={<TracerStudyPage />} />
         <Route path="/alumni/career" element={<CareerPage />} />
+        <Route path="/alumni/events" element={<EventListPage />} />
         <Route path="/alumni/profile" element={<ProfilePage />} />
 
         {/* Admin Routes */}
@@ -107,6 +114,14 @@ function App() {
           element={
             <AdminRoute>
               <AdminAlumniPage />
+            </AdminRoute>
+          }
+        />
+        <Route
+          path="/admin/registrations"
+          element={
+            <AdminRoute>
+              <AdminRegistrationsPage />
             </AdminRoute>
           }
         />
@@ -135,10 +150,26 @@ function App() {
           }
         />
         <Route
+          path="/admin/events"
+          element={
+            <AdminRoute>
+              <AdminEventsPage />
+            </AdminRoute>
+          }
+        />
+        <Route
           path="/admin/notifications"
           element={
             <AdminRoute>
               <AdminNotificationPage />
+            </AdminRoute>
+          }
+        />
+        <Route
+          path="/admin/users"
+          element={
+            <AdminRoute>
+              <AdminUsersPage />
             </AdminRoute>
           }
         />

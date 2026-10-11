@@ -1,8 +1,9 @@
 import React from 'react';
+import { LogOut, Menu } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import Badge from '../ui/Badge';
 
-const Navbar = ({ pageTitle = 'Dashboard', onToggleSidebar }) => {
+const Navbar = ({ pageTitle = 'Dashboard', onToggleSidebar, isNavigationExpanded }) => {
   const { user, logout } = useAuth();
 
   return (
@@ -12,41 +13,29 @@ const Navbar = ({ pageTitle = 'Dashboard', onToggleSidebar }) => {
           type="button"
           className="hamburger"
           onClick={onToggleSidebar}
-          aria-label="Toggle navigation"
-          title="Buka Menu"
+          aria-label={isNavigationExpanded ? 'Sembunyikan menu navigasi' : 'Tampilkan menu navigasi'}
+          aria-expanded={isNavigationExpanded}
+          title={isNavigationExpanded ? 'Sembunyikan menu navigasi' : 'Tampilkan menu navigasi'}
         >
-          ☰
+          <Menu size={19} strokeWidth={1.8} />
         </button>
-        <h2 style={{ fontSize: '1.15rem', fontWeight: 800, margin: 0, color: '#171717' }}>
+        <h2 className="topbar-title">
           {pageTitle}
         </h2>
       </div>
 
       <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-          <div
-            style={{
-              width: '36px',
-              height: '36px',
-              borderRadius: '50%',
-              background: '#000000',
-              color: '#FFFFFF',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              fontWeight: 700,
-              fontSize: '0.85rem',
-            }}
-          >
+          <div className="topbar-avatar">
             {user?.name ? user.name.charAt(0).toUpperCase() : 'U'}
           </div>
           <div style={{ display: 'flex', flexDirection: 'column' }}>
-            <span style={{ fontSize: '0.85rem', fontWeight: 700, color: '#171717' }}>
+            <span className="topbar-user-name">
               {user?.name || 'User'}
             </span>
             <div style={{ marginTop: '2px' }}>
               <Badge variant={user?.role === 'admin' ? 'primary' : 'success'} size="sm">
-                {user?.role === 'admin' ? 'Guru BK / Admin' : user?.role === 'alumni' ? 'Alumni' : 'Siswa'}
+                {user?.role === 'admin' ? 'Admin' : user?.role === 'alumni' ? 'Alumni' : 'Siswa'}
               </Badge>
             </div>
           </div>
@@ -55,14 +44,10 @@ const Navbar = ({ pageTitle = 'Dashboard', onToggleSidebar }) => {
         <button
           onClick={logout}
           className="btn btn-secondary btn-sm"
-          style={{
-            border: '1px solid #E5E5E5',
-            color: '#171717',
-            cursor: 'pointer',
-          }}
           title="Keluar dari akun"
         >
-          Logout
+          <LogOut size={15} strokeWidth={1.8} />
+          Keluar
         </button>
       </div>
     </header>

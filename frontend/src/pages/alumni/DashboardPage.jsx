@@ -10,20 +10,28 @@ const AlumniDashboardPage = () => {
   const [loading, setLoading] = useState(true);
   const [tracerCompleted, setTracerCompleted] = useState(false);
   const [recentCareers, setRecentCareers] = useState([]);
+  const [upcomingEvents, setUpcomingEvents] = useState([]);
 
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const [answersRes, careersRes] = await Promise.all([
+        const [answersRes, ...postResponses] = await Promise.all([
           api.get('/tracer-answers/my').catch(() => ({ data: { answers: [] } })),
-          api.get('/career-posts?limit=3').catch(() => ({ data: { data: [] } })),
+          ...['magang', 'full_time', 'part_time', 'beasiswa'].map((category) =>
+            api.get(`/career-posts?category=${category}`).catch(() => ({ data: { data: [] } }))
+          ),
+          ...['event_mahasiswa', 'event_umum'].map((category) =>
+            api.get(`/career-posts?category=${category}&event_phase=upcoming`).catch(() => ({ data: { data: [] } }))
+          ),
         ]);
 
         const answers = answersRes.data?.answers || [];
         setTracerCompleted(answers.length > 0);
 
-        const careers = careersRes.data?.data || careersRes.data || [];
-        setRecentCareers(Array.isArray(careers) ? careers.slice(0, 3) : []);
+        const careers = postResponses.slice(0, 4).flatMap((response) => response.data?.data || []);
+        setRecentCareers(careers.sort((a, b) => new Date(b.created_at) - new Date(a.created_at)).slice(0, 3));
+        const events = postResponses.slice(4).flatMap((response) => response.data?.data || []);
+        setUpcomingEvents(events.sort((a, b) => new Date(a.created_at) - new Date(b.created_at)));
       } catch (err) {
         console.error('Error fetching dashboard data:', err);
       } finally {
@@ -59,7 +67,7 @@ const AlumniDashboardPage = () => {
             </h1>
             <p style={{ color: '#94a3b8', fontSize: '0.95rem', marginTop: '0.25rem' }}>
               SMAN 1 Talang Padang {profile?.graduation_year ? `• Angkatan ${profile.graduation_year}` : ''}
-              {profile?.nisn ? ` (NISN: ${profile.nisn})` : ''}
+              {user?.nisn ? ` (NISN: ${user.nisn})` : ''}
             </p>
           </div>
 
@@ -177,6 +185,34 @@ const AlumniDashboardPage = () => {
       </div>
 
       {/* Recent Careers Section */}
+      {upcomingEvents.length > 0 && (
+        <section className="card">
+          <div style={{ marginBottom: '1.25rem' }}>
+            <h3 style={{ fontSize: '1.15rem', fontWeight: 700, margin: 0, color: '#f8fafc' }}>
+              Event Akan Datang
+            </h3>
+            <p style={{ margin: '0.25rem 0 0', color: '#94a3b8', fontSize: '0.85rem' }}>
+              Agenda sekolah dan alumni yang telah disetujui.
+            </p>
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: '1rem' }}>
+            {upcomingEvents.map((event) => (
+              <article key={event.id} style={{ border: '1px solid #334155', borderRadius: '0.75rem', overflow: 'hidden' }}>
+                {event.event_image_url && (
+                  <img src={event.event_image_url} alt={`Foto ${event.title}`} style={{ width: '100%', height: 170, objectFit: 'cover' }} />
+                )}
+                <div style={{ padding: '1rem' }}>
+                  <span style={{ fontSize: '0.75rem', color: '#818cf8' }}>{event.company_or_institution}</span>
+                  <h4 style={{ color: '#f1f5f9', margin: '0.35rem 0' }}>{event.title}</h4>
+                  <p style={{ color: '#94a3b8', fontSize: '0.85rem', margin: 0 }}>{event.description}</p>
+                </div>
+              </article>
+            ))}
+          </div>
+        </section>
+      )}
+
+      {/* Recent Careers Section */}
       <div className="card">
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem' }}>
           <div>
@@ -184,7 +220,7 @@ const AlumniDashboardPage = () => {
               Lowongan & Peluang Terbaru
             </h3>
             <p style={{ margin: '0.25rem 0 0', color: '#94a3b8', fontSize: '0.85rem' }}>
-              Info karir, magang, dan beasiswa yang telah diverifikasi oleh Guru BK SMAN 1 Talang Padang
+              Info karir, magang, dan beasiswa yang telah diverifikasi admin SMAN 1 Talang Padang
             </p>
           </div>
           <Link to="/alumni/career" className="btn btn-secondary btn-sm">

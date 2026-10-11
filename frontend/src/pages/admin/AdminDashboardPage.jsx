@@ -37,7 +37,7 @@ const AdminDashboardPage = () => {
         const [recapRes, waRes, careerRes, alumniRes] = await Promise.all([
           api.get('/tracer-answers/recap').catch(() => ({ data: null })),
           api.get('/wa-notifications/stats').catch(() => ({ data: { stats: {} } })),
-          api.get('/career-posts').catch(() => ({ data: { total: 0 } })),
+          api.get('/career-posts?status=approved').catch(() => ({ data: { total: 0 } })),
           api.get('/alumni').catch(() => ({ data: { total: 0 } })),
         ]);
 
@@ -76,15 +76,9 @@ const AdminDashboardPage = () => {
           overallDist.gap_year || 0,
           overallDist.belum_kerja || 0,
         ],
-        backgroundColor: [
-          '#6366f1', // Indigo
-          '#10b981', // Green
-          '#f59e0b', // Amber
-          '#64748b', // Slate
-          '#ef4444', // Red
-        ],
-        borderColor: '#1e293b',
-        borderWidth: 2,
+        backgroundColor: ['#456c83', '#477460', '#ad8542', '#89958d', '#b56a5d'],
+        borderColor: '#ffffff',
+        borderWidth: 3,
       },
     ],
   };
@@ -96,7 +90,7 @@ const AdminDashboardPage = () => {
       legend: {
         position: 'bottom',
         labels: {
-          color: '#cbd5e1',
+          color: '#58665f',
           padding: 16,
           font: { size: 12 },
         },
@@ -104,30 +98,17 @@ const AdminDashboardPage = () => {
     },
   };
 
-  // Setup Bar Chart for Years
-  const yearsRecap = recapData?.recap_per_year || [];
+  // Setup bar chart for the most popular higher-education institutions
+  const topCampuses = recapData?.top_campuses || [];
   const barData = {
-    labels: yearsRecap.map((y) => `Angkatan ${y.graduation_year}`),
+    labels: topCampuses.map((campus) => campus.campus_name),
     datasets: [
       {
-        label: 'Mahasiswa',
-        data: yearsRecap.map((y) => y.distribution?.mahasiswa || 0),
-        backgroundColor: '#6366f1',
-      },
-      {
-        label: 'Bekerja',
-        data: yearsRecap.map((y) => y.distribution?.bekerja || 0),
-        backgroundColor: '#10b981',
-      },
-      {
-        label: 'Wirausaha',
-        data: yearsRecap.map((y) => y.distribution?.wirausaha || 0),
-        backgroundColor: '#f59e0b',
-      },
-      {
-        label: 'Gap Year / Lainnya',
-        data: yearsRecap.map((y) => (y.distribution?.gap_year || 0) + (y.distribution?.belum_kerja || 0)),
-        backgroundColor: '#64748b',
+        label: 'Jumlah Alumni',
+        data: topCampuses.map((campus) => campus.total),
+        backgroundColor: '#477460',
+        borderRadius: 3,
+        barThickness: 18,
       },
     ],
   };
@@ -135,27 +116,25 @@ const AdminDashboardPage = () => {
   const barOptions = {
     responsive: true,
     maintainAspectRatio: false,
+    indexAxis: 'y',
     scales: {
       x: {
-        stacked: true,
-        ticks: { color: '#94a3b8' },
-        grid: { color: 'rgba(51, 65, 85, 0.5)' },
+        beginAtZero: true,
+        ticks: { color: '#68756e', precision: 0, stepSize: 1 },
+        grid: { color: '#e9eeeb' },
       },
       y: {
-        stacked: true,
-        ticks: { color: '#94a3b8', stepSize: 1 },
-        grid: { color: 'rgba(51, 65, 85, 0.5)' },
+        ticks: { color: '#68756e' },
+        grid: { display: false },
       },
     },
     plugins: {
-      legend: {
-        position: 'bottom',
-        labels: { color: '#cbd5e1', padding: 12 },
-      },
+      legend: { display: false },
     },
   };
 
-  const totalTracked = recapData?.overall?.total || alumniCount;
+  const totalTracked = recapData?.overall?.total ?? alumniCount;
+  const responseRate = recapData?.response_rate?.percentage ?? 0;
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
@@ -163,20 +142,20 @@ const AdminDashboardPage = () => {
       <div
         className="card-glass"
         style={{
-          background: 'linear-gradient(135deg, rgba(99, 102, 241, 0.15) 0%, rgba(30, 41, 59, 0.8) 100%)',
-          border: '1px solid rgba(99, 102, 241, 0.3)',
+          background: '#ffffff',
+          border: '1px solid #dfe5e1',
           padding: '1.75rem',
         }}
       >
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem' }}>
           <div>
-            <span style={{ fontSize: '0.8rem', color: '#818cf8', fontWeight: 700, letterSpacing: '0.05em' }}>
-              PANEL BIMBINGAN KONSELING & AKREDITASI
+            <span style={{ fontSize: '0.8rem', color: '#31594b', fontWeight: 700, letterSpacing: '0.05em' }}>
+              PANEL ADMINISTRASI & AKREDITASI
             </span>
-            <h1 style={{ fontSize: '1.75rem', fontWeight: 800, color: '#f8fafc', margin: '0.25rem 0' }}>
+            <h1 style={{ fontSize: '1.75rem', fontWeight: 700, color: '#202a26', margin: '0.25rem 0' }}>
               Sistem Pelacakan Alumni SMAN 1 Talang Padang
             </h1>
-            <p style={{ color: '#94a3b8', fontSize: '0.875rem', margin: 0 }}>
+            <p style={{ color: '#68756e', fontSize: '0.875rem', margin: 0 }}>
               Pantau sebaran lulusan, tingkat keterserapan kerja/kuliah, dan pengiriman pesan WhatsApp Gateway secara real-time.
             </p>
           </div>
@@ -195,9 +174,7 @@ const AdminDashboardPage = () => {
       {/* Stats Cards */}
       <div className="stats-grid">
         <div className="card-stats">
-          <div className="stats-icon" style={{ background: 'rgba(99, 102, 241, 0.15)', color: '#818cf8' }}>
-            👥
-          </div>
+          <div className="stats-icon">👥</div>
           <div>
             <div className="stats-value">{totalTracked}</div>
             <div className="stats-label">Total Alumni Terdata</div>
@@ -205,33 +182,25 @@ const AdminDashboardPage = () => {
         </div>
 
         <div className="card-stats">
-          <div className="stats-icon" style={{ background: 'rgba(16, 185, 129, 0.15)', color: '#10b981' }}>
-            🎓
-          </div>
+          <div className="stats-icon">📋</div>
           <div>
             <div className="stats-value">
-              {recapData?.overall?.percentages?.mahasiswa || 0}%
+              {responseRate}%
             </div>
-            <div className="stats-label">Melanjutkan Kuliah (PTN/PTS)</div>
+            <div className="stats-label">Response Rate Kuesioner</div>
           </div>
         </div>
 
         <div className="card-stats">
-          <div className="stats-icon" style={{ background: 'rgba(14, 165, 233, 0.15)', color: '#0ea5e9' }}>
-            💼
-          </div>
+          <div className="stats-icon">💼</div>
           <div>
-            <div className="stats-value">
-              {recapData?.overall?.percentages?.bekerja || 0}%
-            </div>
-            <div className="stats-label">Langsung Bekerja / Wirausaha</div>
+            <div className="stats-value">{careerCount}</div>
+            <div className="stats-label">Postingan Karier Aktif</div>
           </div>
         </div>
 
         <div className="card-stats">
-          <div className="stats-icon" style={{ background: 'rgba(245, 158, 11, 0.15)', color: '#f59e0b' }}>
-            💬
-          </div>
+          <div className="stats-icon">💬</div>
           <div>
             <div className="stats-value">{waStats.sent} / {waStats.total}</div>
             <div className="stats-label">Pesan WhatsApp Gateway Terkirim</div>
@@ -243,10 +212,10 @@ const AdminDashboardPage = () => {
       <div className="charts-grid">
         <div className="card" style={{ display: 'flex', flexDirection: 'column' }}>
           <div style={{ marginBottom: '1rem' }}>
-            <h3 style={{ fontSize: '1.1rem', fontWeight: 700, margin: 0, color: '#f8fafc' }}>
+            <h3 style={{ fontSize: '1.1rem', fontWeight: 700, margin: 0, color: '#202a26' }}>
               📊 Distribusi Status Lulusan
             </h3>
-            <span style={{ fontSize: '0.8rem', color: '#94a3b8' }}>
+            <span style={{ fontSize: '0.8rem', color: '#68756e' }}>
               Persentase mahasiswa, pekerja, wirausaha, dan persiapan
             </span>
           </div>
@@ -257,11 +226,11 @@ const AdminDashboardPage = () => {
 
         <div className="card" style={{ display: 'flex', flexDirection: 'column' }}>
           <div style={{ marginBottom: '1rem' }}>
-            <h3 style={{ fontSize: '1.1rem', fontWeight: 700, margin: 0, color: '#f8fafc' }}>
-              📈 Sebaran Alumni per Angkatan
+            <h3 style={{ fontSize: '1.1rem', fontWeight: 700, margin: 0, color: '#202a26' }}>
+              📈 10 Perguruan Tinggi Favorit
             </h3>
-            <span style={{ fontSize: '0.8rem', color: '#94a3b8' }}>
-              Grafik komparasi per tahun kelulusan
+            <span style={{ fontSize: '0.8rem', color: '#68756e' }}>
+              Kampus dengan jumlah alumni terbanyak
             </span>
           </div>
           <div style={{ flex: 1, minHeight: '300px', position: 'relative' }}>
@@ -272,76 +241,76 @@ const AdminDashboardPage = () => {
 
       {/* Quick Action Cards */}
       <div className="card">
-        <h3 style={{ fontSize: '1.1rem', fontWeight: 700, marginBottom: '1rem', color: '#cbd5e1' }}>
+        <h3 style={{ fontSize: '1.1rem', fontWeight: 700, marginBottom: '1rem', color: '#202a26' }}>
           ⚡ Pintasan Cepat Administrasi
         </h3>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '1rem' }}>
           <Link
-            to="/admin/alumni"
-            style={{
-              background: '#0f172a',
-              padding: '1.25rem',
-              borderRadius: '0.75rem',
-              border: '1px solid #334155',
-              display: 'flex',
-              flexDirection: 'column',
-              gap: '0.5rem',
-            }}
-          >
-            <div style={{ fontSize: '1.5rem' }}>🔗</div>
-            <div style={{ fontWeight: 700, color: '#f1f5f9' }}>Generate Magic Link WA</div>
-            <div style={{ fontSize: '0.8rem', color: '#94a3b8' }}>Buat tautan login 1-klik untuk alumni tanpa ribet password.</div>
-          </Link>
-
-          <Link
-            to="/admin/tracer-questions"
-            style={{
-              background: '#0f172a',
-              padding: '1.25rem',
-              borderRadius: '0.75rem',
-              border: '1px solid #334155',
-              display: 'flex',
-              flexDirection: 'column',
-              gap: '0.5rem',
-            }}
-          >
-            <div style={{ fontSize: '1.5rem' }}>📋</div>
-            <div style={{ fontWeight: 700, color: '#f1f5f9' }}>Kelola Soal Kuesioner</div>
-            <div style={{ fontSize: '0.8rem', color: '#94a3b8' }}>Tambah, ubah tipe pilihan, dan atur urutan instrumen tracer.</div>
-          </Link>
-
-          <Link
-            to="/admin/career"
-            style={{
-              background: '#0f172a',
-              padding: '1.25rem',
-              borderRadius: '0.75rem',
-              border: '1px solid #334155',
-              display: 'flex',
-              flexDirection: 'column',
-              gap: '0.5rem',
-            }}
-          >
-            <div style={{ fontSize: '1.5rem' }}>📢</div>
-            <div style={{ fontWeight: 700, color: '#f1f5f9' }}>Targeted Push Karir WA</div>
-            <div style={{ fontSize: '0.8rem', color: '#94a3b8' }}>Kirim broadcast lowongan spesifik ke kelompok alumni yang relevan.</div>
-          </Link>
-
-          <Link
             to="/admin/notifications"
             style={{
-              background: '#0f172a',
+              background: '#f7f9f7',
               padding: '1.25rem',
               borderRadius: '0.75rem',
-              border: '1px solid #334155',
+              border: '1px solid #dfe5e1',
               display: 'flex',
               flexDirection: 'column',
               gap: '0.5rem',
             }}
           >
             <div style={{ fontSize: '1.5rem' }}>💬</div>
-            <div style={{ fontWeight: 700, color: '#f1f5f9' }}>Pantau WA Gateway</div>
-            <div style={{ fontSize: '0.8rem', color: '#94a3b8' }}>Lihat log antrian notifikasi, pengiriman, dan status Fonnte.</div>
+            <div style={{ fontWeight: 700, color: '#202a26' }}>Pengingat & Notifikasi WA</div>
+            <div style={{ fontSize: '0.8rem', color: '#68756e' }}>Kirim pengingat tracer atau broadcast kepada alumni terpilih.</div>
+          </Link>
+
+          <Link
+            to="/admin/tracer-questions"
+            style={{
+              background: '#f7f9f7',
+              padding: '1.25rem',
+              borderRadius: '0.75rem',
+              border: '1px solid #dfe5e1',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '0.5rem',
+            }}
+          >
+            <div style={{ fontSize: '1.5rem' }}>📋</div>
+            <div style={{ fontWeight: 700, color: '#202a26' }}>Kelola Soal Kuesioner</div>
+            <div style={{ fontSize: '0.8rem', color: '#68756e' }}>Tambah, ubah tipe pilihan, dan atur urutan instrumen tracer.</div>
+          </Link>
+
+          <Link
+            to="/admin/career"
+            style={{
+              background: '#f7f9f7',
+              padding: '1.25rem',
+              borderRadius: '0.75rem',
+              border: '1px solid #dfe5e1',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '0.5rem',
+            }}
+          >
+            <div style={{ fontSize: '1.5rem' }}>📢</div>
+            <div style={{ fontWeight: 700, color: '#202a26' }}>Moderasi Karir & Event</div>
+            <div style={{ fontSize: '0.8rem', color: '#68756e' }}>Kelola lowongan dan event serta jangkauan notifikasi otomatis.</div>
+          </Link>
+
+          <Link
+            to="/admin/notifications"
+            style={{
+              background: '#f7f9f7',
+              padding: '1.25rem',
+              borderRadius: '0.75rem',
+              border: '1px solid #dfe5e1',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '0.5rem',
+            }}
+          >
+            <div style={{ fontSize: '1.5rem' }}>💬</div>
+            <div style={{ fontWeight: 700, color: '#202a26' }}>Pantau WA Gateway</div>
+            <div style={{ fontSize: '0.8rem', color: '#68756e' }}>Lihat log antrian notifikasi, pengiriman, dan status Fonnte.</div>
           </Link>
         </div>
       </div>

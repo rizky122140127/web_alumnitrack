@@ -4,12 +4,11 @@ namespace App\Http\Controllers\Auth;
 
 use App\Http\Controllers\Controller;
 use App\Models\AlumniProfile;
-use App\Models\MagicLink;
 use App\Models\User;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
-use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 
 class AuthController extends Controller
@@ -20,65 +19,81 @@ class AuthController extends Controller
     public function register(Request $request): JsonResponse
     {
         $validated = $request->validate([
-            'name'            => 'required|string|max:255',
-            'email'           => 'nullable|email|unique:users,email',
-            'phone_number'    => 'required|string|unique:users,phone_number',
-            'password'        => 'required|string|min:6|confirmed',
-            'role'            => ['sometimes', Rule::in(['alumni', 'siswa'])],
-            // Alumni profile fields (optional on register)
-            'nisn'            => 'required_if:role,alumni|string|size:10|unique:alumni_profiles,nisn',
-            'graduation_year' => 'required_if:role,alumni|integer|min:2000|max:2099',
-            'current_status'  => ['sometimes', Rule::in([
+            'name' => 'required|string|max:255',
+            'email' => 'nullable|email|unique:users,email',
+            'phone_number' => 'required|string|unique:users,phone_number',
+            'password' => 'required|string|min:8|confirmed',
+            'role' => 'prohibited',
+            'nisn' => 'required|string|regex:/^\d{10}$/|unique:users,nisn',
+            'graduation_year' => 'required|integer|min:2000|max:2099',
+            'current_status' => ['sometimes', Rule::in([
                 'mahasiswa', 'gap_year', 'bekerja', 'wirausaha', 'belum_kerja',
             ])],
         ]);
 
-        $user = User::create([
-            'name'         => $validated['name'],
-            'email'        => $validated['email'] ?? null,
-            'phone_number' => $validated['phone_number'],
-            'password'     => Hash::make($validated['password']),
-            'role'         => $validated['role'] ?? 'alumni',
-        ]);
-
-        // Create alumni profile if registering as alumni
-        if ($user->role === 'alumni' && isset($validated['nisn'])) {
-            AlumniProfile::create([
-                'user_id'         => $user->id,
-                'nisn'            => $validated['nisn'],
-                'graduation_year' => $validated['graduation_year'],
-                'current_status'  => $validated['current_status'] ?? 'belum_kerja',
+        $user = DB::transaction(function () use ($validated) {
+            $user = User::create([
+                'name' => $validated['name'],
+                'email' => $validated['email'] ?? null,
+                'phone_number' => $validated['phone_number'],
+                'nisn' => $validated['nisn'],
+                'password' => Hash::make($validated['password']),
+                'role' => 'alumni',
+                'alumni_approval_status' => 'pending',
             ]);
-        }
 
-        $token = $user->createToken('auth-token')->plainTextToken;
+            AlumniProfile::create([
+                'user_id' => $user->id,
+                'graduation_year' => $validated['graduation_year'],
+                'current_status' => $validated['current_status'] ?? 'belum_kerja',
+            ]);
+
+            return $user;
+        });
 
         return response()->json([
-            'message' => 'Registrasi berhasil.',
-            'user'    => $user->load('alumniProfile'),
-            'token'   => $token,
+            'message' => 'Pendaftaran berhasil dikirim dan menunggu verifikasi admin sekolah.',
+            'user' => $user->load('alumniProfile'),
+            'token' => null,
+            'approval_status' => $user->alumni_approval_status,
         ], 201);
     }
 
     /**
-     * Login with email/phone + password (conventional).
+     * Alumni authenticate with NISN; admins use email or phone.
      */
     public function login(Request $request): JsonResponse
     {
         $validated = $request->validate([
-            'login'    => 'required|string', // accepts email or phone_number
+            'nisn' => 'required_without:login|string|size:10',
+            'login' => 'required_without:nisn|string',
             'password' => 'required|string',
         ]);
 
-        // Try finding by email first, then by phone number
-        $user = User::where('email', $validated['login'])
-            ->orWhere('phone_number', $validated['login'])
-            ->first();
+        $user = isset($validated['nisn'])
+            ? User::where('nisn', $validated['nisn'])
+                ->where('role', 'alumni')
+                ->first()
+            : User::where('role', 'admin')
+                ->where(function ($query) use ($validated) {
+                    $query->where('email', $validated['login'])
+                        ->orWhere('phone_number', $validated['login']);
+                })
+                ->first();
 
-        if (!$user || !Hash::check($validated['password'], $user->password)) {
+        if (! $user || ! Hash::check($validated['password'], $user->password)) {
             return response()->json([
                 'message' => 'Kredensial tidak valid.',
             ], 401);
+        }
+
+        if ($user->role === 'alumni' && $user->alumni_approval_status !== 'approved') {
+            return response()->json([
+                'message' => $user->alumni_approval_status === 'rejected'
+                    ? 'Pendaftaran alumni Anda ditolak. Silakan hubungi admin untuk informasi lebih lanjut.'
+                    : 'Pendaftaran alumni Anda masih menunggu verifikasi admin sekolah.',
+                'approval_status' => $user->alumni_approval_status,
+            ], 403);
         }
 
         // Revoke previous tokens
@@ -87,75 +102,8 @@ class AuthController extends Controller
 
         return response()->json([
             'message' => 'Login berhasil.',
-            'user'    => $user->load('alumniProfile'),
-            'token'   => $token,
-        ]);
-    }
-
-    /**
-     * Generate a magic link for a specific user (Admin only).
-     */
-    public function generateMagicLink(Request $request): JsonResponse
-    {
-        $validated = $request->validate([
-            'user_id' => 'required|exists:users,id',
-        ]);
-
-        $token = Str::random(64);
-
-        $magicLink = MagicLink::create([
-            'user_id'    => $validated['user_id'],
-            'token'      => $token,
-            'expires_at' => now()->addHours(24),
-            'is_used'    => false,
-        ]);
-
-        // In production, this would be sent via WA Gateway
-        $linkUrl = config('app.frontend_url', 'http://localhost:5173')
-            . '/auth/magic-link?token=' . $token;
-
-        return response()->json([
-            'message'    => 'Magic link berhasil dibuat.',
-            'magic_link' => $linkUrl,
-            'token'      => $token,
-            'expires_at' => $magicLink->expires_at->toIso8601String(),
-        ]);
-    }
-
-    /**
-     * Validate magic link token and issue Sanctum token.
-     */
-    public function validateMagicLink(Request $request): JsonResponse
-    {
-        $validated = $request->validate([
-            'token' => 'required|string|size:64',
-        ]);
-
-        $magicLink = MagicLink::where('token', $validated['token'])->first();
-
-        if (!$magicLink) {
-            return response()->json([
-                'message' => 'Token tidak ditemukan.',
-            ], 404);
-        }
-
-        if (!$magicLink->isValid()) {
-            return response()->json([
-                'message' => 'Token sudah digunakan atau sudah kedaluwarsa.',
-            ], 422);
-        }
-
-        // Mark as used
-        $magicLink->update(['is_used' => true]);
-
-        $user = $magicLink->user;
-        $user->tokens()->delete();
-        $authToken = $user->createToken('magic-link-token')->plainTextToken;
-
-        return response()->json([
-            'message' => 'Autentikasi magic link berhasil.',
-            'user'    => $user->load('alumniProfile'),
-            'token'   => $authToken,
+            'user' => $user->load('alumniProfile'),
+            'token' => $token,
         ]);
     }
 
@@ -179,26 +127,38 @@ class AuthController extends Controller
         $user = $request->user();
 
         $validated = $request->validate([
-            'name'           => 'sometimes|string|max:255',
-            'email'          => 'sometimes|nullable|email|unique:users,email,' . $user->id,
-            'phone_number'   => 'sometimes|string|unique:users,phone_number,' . $user->id,
-            'is_wa_active'   => 'sometimes|boolean',
+            'name' => 'sometimes|string|max:255',
+            'email' => 'sometimes|nullable|email|unique:users,email,'.$user->id,
+            'phone_number' => 'sometimes|string|unique:users,phone_number,'.$user->id,
+            'nisn' => ['sometimes', 'required', 'string', 'regex:/^\d{10}$/', Rule::unique('users', 'nisn')->ignore($user->id)],
+            'is_wa_active' => 'sometimes|boolean',
+            'current_password' => 'required_with:password|string',
+            'password' => 'sometimes|string|min:8|confirmed',
             // Alumni profile fields
             'current_status' => ['sometimes', Rule::in([
                 'mahasiswa', 'gap_year', 'bekerja', 'wirausaha', 'belum_kerja',
             ])],
-            'campus_name'    => 'sometimes|nullable|string|max:255',
-            'major_name'     => 'sometimes|nullable|string|max:255',
-            'company_name'   => 'sometimes|nullable|string|max:255',
-            'job_title'      => 'sometimes|nullable|string|max:255',
+            'campus_name' => 'sometimes|nullable|string|max:255',
+            'major_name' => 'sometimes|nullable|string|max:255',
+            'company_name' => 'sometimes|nullable|string|max:255',
+            'job_title' => 'sometimes|nullable|string|max:255',
         ]);
 
         // Update user fields
         $userFields = collect($validated)->only([
-            'name', 'email', 'phone_number', 'is_wa_active',
+            'name', 'email', 'phone_number', 'nisn', 'is_wa_active',
         ])->toArray();
 
-        if (!empty($userFields)) {
+        if (! empty($validated['password'])) {
+            if (! Hash::check($validated['current_password'], $user->password)) {
+                return response()->json([
+                    'message' => 'Kata sandi saat ini tidak sesuai.',
+                ], 422);
+            }
+            $userFields['password'] = Hash::make($validated['password']);
+        }
+
+        if (! empty($userFields)) {
             $user->update($userFields);
         }
 
@@ -207,13 +167,13 @@ class AuthController extends Controller
             'current_status', 'campus_name', 'major_name', 'company_name', 'job_title',
         ])->toArray();
 
-        if (!empty($profileFields) && $user->alumniProfile) {
+        if (! empty($profileFields) && $user->alumniProfile) {
             $user->alumniProfile->update($profileFields);
         }
 
         return response()->json([
             'message' => 'Profil berhasil diperbarui.',
-            'user'    => $user->fresh()->load('alumniProfile'),
+            'user' => $user->fresh()->load('alumniProfile'),
         ]);
     }
 

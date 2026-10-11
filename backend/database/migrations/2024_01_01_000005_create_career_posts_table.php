@@ -12,7 +12,9 @@ return new class extends Migration
             $table->id();
             $table->foreignId('author_id')->constrained('users')->onDelete('cascade');
             $table->string('title');
-            $table->enum('category', ['magang', 'full_time', 'part_time', 'beasiswa']);
+            $table->enum('category', [
+                'magang', 'full_time', 'part_time', 'beasiswa', 'event_mahasiswa', 'event_umum',
+            ]);
             $table->string('company_or_institution');
             $table->text('description');
             $table->string('registration_link')->nullable();

@@ -12,6 +12,7 @@ const categories = [
   { id: 'part_time', label: 'Part Time' },
   { id: 'beasiswa', label: 'Beasiswa' },
 ];
+const careerCategories = ['magang', 'full_time', 'part_time', 'beasiswa'];
 
 const CareerPage = () => {
   const [posts, setPosts] = useState([]);
@@ -34,9 +35,11 @@ const CareerPage = () => {
   const fetchPosts = async () => {
     try {
       setLoading(true);
-      const res = await api.get('/career-posts');
-      const data = res.data?.data || res.data || [];
-      setPosts(Array.isArray(data) ? data : []);
+      const responses = await Promise.all(
+        careerCategories.map((category) => api.get(`/career-posts?category=${category}`))
+      );
+      const data = responses.flatMap((response) => response.data?.data || []);
+      setPosts(data.sort((a, b) => new Date(b.created_at) - new Date(a.created_at)));
     } catch (err) {
       console.error('Error fetching career posts:', err);
       toast.error('Gagal mengambil daftar lowongan karir.');
@@ -62,7 +65,7 @@ const CareerPage = () => {
 
     try {
       await api.post('/career-posts', formData);
-      toast.success('Lowongan berhasil dikirim! Menunggu persetujuan Guru BK.');
+      toast.success('Lowongan berhasil dikirim! Menunggu persetujuan admin.');
       setModalOpen(false);
       setFormData({
         title: '',
@@ -196,7 +199,7 @@ const CareerPage = () => {
 
               <div style={{ marginTop: '1.5rem', paddingTop: '1rem', borderTop: '1px solid #334155', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <span style={{ fontSize: '0.75rem', color: '#64748b' }}>
-                  Oleh: {post.author?.name || 'Alumni / BK'}
+                  Oleh: {post.author?.name || 'Alumni / Admin'}
                 </span>
 
                 {post.registration_link && (

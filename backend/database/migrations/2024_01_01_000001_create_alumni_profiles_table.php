@@ -10,11 +10,10 @@ return new class extends Migration
     {
         Schema::create('alumni_profiles', function (Blueprint $table) {
             $table->id();
-            $table->foreignId('user_id')->constrained('users')->onDelete('cascade');
-            $table->string('nisn', 10)->unique();
+            $table->foreignId('user_id')->unique()->constrained('users')->onDelete('cascade');
             $table->year('graduation_year');
             $table->enum('current_status', [
-                'mahasiswa', 'gap_year', 'bekerja', 'wirausaha', 'belum_kerja'
+                'mahasiswa', 'gap_year', 'bekerja', 'wirausaha', 'belum_kerja',
             ])->default('belum_kerja');
             $table->string('campus_name')->nullable();
             $table->string('major_name')->nullable();

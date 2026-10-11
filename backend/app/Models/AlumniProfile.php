@@ -12,7 +12,6 @@ class AlumniProfile extends Model
 
     protected $fillable = [
         'user_id',
-        'nisn',
         'graduation_year',
         'current_status',
         'campus_name',

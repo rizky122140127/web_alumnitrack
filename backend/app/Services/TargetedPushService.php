@@ -3,7 +3,6 @@
 namespace App\Services;
 
 use App\Jobs\SendWaNotificationJob;
-use App\Models\AlumniProfile;
 use App\Models\CareerPost;
 use App\Models\User;
 use App\Models\WaNotification;
@@ -17,17 +16,20 @@ class TargetedPushService
      * - magang     → mahasiswa, gap_year, belum_kerja
      * - full_time  → belum_kerja, gap_year (EXCLUDE mahasiswa)
      * - part_time  → mahasiswa, belum_kerja, gap_year
-     * - beasiswa   → ALL alumni with is_wa_active = true
+     * Events do not send WhatsApp notifications.
      */
     public function dispatchForCareerPost(CareerPost $post): void
     {
+        if (in_array($post->category, ['event_mahasiswa', 'event_umum'], true)) {
+            return;
+        }
+
         $recipientStatuses = $this->getTargetStatuses($post->category);
 
         $query = User::where('is_wa_active', true)
-            ->where('role', 'alumni');
+            ->where('role', 'alumni')
+            ->where('alumni_approval_status', 'approved');
 
-        // For beasiswa, send to ALL active alumni
-        // For others, filter by alumni profile status
         if ($post->category !== 'beasiswa') {
             $query->whereHas('alumniProfile', function ($q) use ($recipientStatuses) {
                 $q->whereIn('current_status', $recipientStatuses);
@@ -38,11 +40,11 @@ class TargetedPushService
 
         foreach ($recipients as $user) {
             $notification = WaNotification::create([
-                'user_id'           => $user->id,
-                'career_post_id'    => $post->id,
+                'user_id' => $user->id,
+                'career_post_id' => $post->id,
                 'notification_type' => 'targeted_push',
-                'message_content'   => $this->buildMessage($post, $user),
-                'status'            => 'queued',
+                'message_content' => $this->buildMessage($post, $user),
+                'status' => 'queued',
             ]);
 
             SendWaNotificationJob::dispatch($notification);
@@ -55,11 +57,11 @@ class TargetedPushService
     protected function getTargetStatuses(string $category): array
     {
         return match ($category) {
-            'magang'    => ['mahasiswa', 'gap_year', 'belum_kerja'],
+            'magang' => ['mahasiswa', 'gap_year', 'belum_kerja'],
             'full_time' => ['belum_kerja', 'gap_year'],
             'part_time' => ['mahasiswa', 'belum_kerja', 'gap_year'],
-            'beasiswa'  => [], // Not used — all alumni
-            default     => [],
+            'beasiswa' => [],
+            default => [],
         };
     }
 
@@ -69,10 +71,10 @@ class TargetedPushService
     protected function buildMessage(CareerPost $post, User $user): string
     {
         $categoryLabels = [
-            'magang'    => '📋 Magang',
+            'magang' => '📋 Magang',
             'full_time' => '💼 Full-Time',
             'part_time' => '⏰ Part-Time',
-            'beasiswa'  => '🎓 Beasiswa',
+            'beasiswa' => '🎓 Beasiswa',
         ];
 
         $label = $categoryLabels[$post->category] ?? $post->category;

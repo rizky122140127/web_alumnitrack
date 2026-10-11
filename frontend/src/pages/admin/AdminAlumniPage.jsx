@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { Eye, Pencil, Save, X } from 'lucide-react';
 import api from '../../api/axios';
 import { useToast } from '../../contexts/ToastContext';
 import Badge from '../../components/ui/Badge';
@@ -13,8 +14,9 @@ const AdminAlumniPage = () => {
   const [statusFilter, setStatusFilter] = useState('');
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
-  const [magicLinkModal, setMagicLinkModal] = useState({ open: false, url: '', alumni: null });
-  const [generatingLink, setGeneratingLink] = useState(false);
+  const [profileModal, setProfileModal] = useState({ open: false, loading: false, editing: false, alumni: null });
+  const [profileForm, setProfileForm] = useState(null);
+  const [savingProfile, setSavingProfile] = useState(false);
 
   const toast = useToast();
 
@@ -49,27 +51,62 @@ const AdminAlumniPage = () => {
     fetchAlumni();
   };
 
-  const handleGenerateMagicLink = async (alumni) => {
-    setGeneratingLink(true);
+  const openProfile = async (alumni, editing = false) => {
+    setProfileModal({ open: true, loading: true, editing, alumni: null });
+    setProfileForm(null);
     try {
-      const res = await api.post('/auth/generate-magic-link', { user_id: alumni.id });
-      setMagicLinkModal({
-        open: true,
-        url: res.data.magic_link,
-        alumni,
+      const response = await api.get(`/alumni/${alumni.id}`);
+      const fullAlumni = response.data.user;
+      const profile = fullAlumni.alumni_profile || fullAlumni.alumniProfile || {};
+      setProfileModal({ open: true, loading: false, editing, alumni: fullAlumni });
+      setProfileForm({
+        name: fullAlumni.name || '',
+        email: fullAlumni.email || '',
+        phone_number: fullAlumni.phone_number || '',
+        is_wa_active: Boolean(fullAlumni.is_wa_active),
+        nisn: fullAlumni.nisn || '',
+        graduation_year: profile.graduation_year || '',
+        current_status: profile.current_status || 'belum_kerja',
+        campus_name: profile.campus_name || '',
+        major_name: profile.major_name || '',
+        company_name: profile.company_name || '',
+        job_title: profile.job_title || '',
       });
-      toast.success(`Magic link untuk ${alumni.name} berhasil dibuat!`);
-    } catch (err) {
-      toast.error(err.response?.data?.message || 'Gagal membuat magic link.');
-    } finally {
-      setGeneratingLink(false);
+    } catch (error) {
+      console.error('Error loading alumni profile:', error);
+      toast.error(error.response?.data?.message || 'Gagal memuat profil alumni.');
+      setProfileModal({ open: false, loading: false, editing: false, alumni: null });
     }
   };
 
-  const copyToClipboard = (text) => {
-    navigator.clipboard.writeText(text);
-    toast.info('Tautan berhasil disalin ke clipboard!');
+  const handleSaveProfile = async (event) => {
+    event.preventDefault();
+    if (!profileModal.alumni || !profileForm) return;
+    setSavingProfile(true);
+    try {
+      const response = await api.put(`/alumni/${profileModal.alumni.id}`, {
+        ...profileForm,
+        email: profileForm.email || null,
+        graduation_year: Number(profileForm.graduation_year),
+      });
+      const updated = response.data.user;
+      setProfileModal({ open: true, loading: false, editing: false, alumni: { ...profileModal.alumni, ...updated } });
+      toast.success('Profil alumni berhasil diperbarui.');
+      await fetchAlumni();
+    } catch (error) {
+      const validationErrors = error.response?.data?.errors;
+      const firstError = validationErrors ? Object.values(validationErrors)[0]?.[0] : null;
+      toast.error(firstError || error.response?.data?.message || 'Gagal memperbarui profil alumni.');
+    } finally {
+      setSavingProfile(false);
+    }
   };
+
+  const updateProfileForm = (field, value) => {
+    setProfileForm((current) => ({ ...current, [field]: value }));
+  };
+
+  const closeProfile = () => setProfileModal({ open: false, loading: false, editing: false, alumni: null });
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
@@ -81,7 +118,7 @@ const AdminAlumniPage = () => {
               Direktori & Database Alumni
             </h1>
             <p style={{ color: '#94a3b8', fontSize: '0.875rem', marginTop: '0.25rem' }}>
-              Data penelusuran lulusan SMAN 1 Talang Padang beserta status tracer dan akses Magic Link
+              Data penelusuran lulusan SMAN 1 Talang Padang beserta status tracer
             </p>
           </div>
         </div>
@@ -172,7 +209,7 @@ const AdminAlumniPage = () => {
                         </div>
                       </td>
                       <td>
-                        <div>NISN: {prof?.nisn || '-'}</div>
+                        <div>NISN: {alumni.nisn || '-'}</div>
                         <div style={{ fontSize: '0.75rem', color: '#818cf8', fontWeight: 600 }}>
                           Lulus: {prof?.graduation_year || '-'}
                         </div>
@@ -204,12 +241,20 @@ const AdminAlumniPage = () => {
                       </td>
                       <td style={{ textAlign: 'right' }}>
                         <button
-                          onClick={() => handleGenerateMagicLink(alumni)}
+                          type="button"
+                          onClick={() => openProfile(alumni)}
                           className="btn btn-secondary btn-sm"
-                          disabled={generatingLink}
-                          title="Generate link login 1-klik untuk WhatsApp"
+                          title="Lihat profil alumni"
                         >
-                          🔗 Magic Link
+                          <Eye size={14} /> Profil
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => openProfile(alumni, true)}
+                          className="btn btn-secondary btn-sm"
+                          title="Edit data alumni"
+                        >
+                          <Pencil size={14} /> Edit
                         </button>
                       </td>
                     </tr>
@@ -244,61 +289,120 @@ const AdminAlumniPage = () => {
         )}
       </div>
 
-      {/* Magic Link Modal */}
       <Modal
-        isOpen={magicLinkModal.open}
-        onClose={() => setMagicLinkModal({ open: false, url: '', alumni: null })}
-        title="Magic Link Login WhatsApp"
-        maxWidth="500px"
+        isOpen={profileModal.open}
+        onClose={closeProfile}
+        title={profileModal.editing ? 'Edit Profil Alumni' : 'Profil Alumni'}
+        maxWidth="760px"
       >
-        <div>
-          <p style={{ color: '#94a3b8', fontSize: '0.875rem', marginBottom: '1rem' }}>
-            Tautan otentikasi sekali klik otomatis untuk:{' '}
-            <strong style={{ color: '#f8fafc' }}>{magicLinkModal.alumni?.name}</strong> (
-            {magicLinkModal.alumni?.phone_number}). Tautan ini berlaku selama 24 jam.
-          </p>
-
-          <div className="form-group">
-            <label className="form-label">Tautan Magic Link:</label>
-            <div style={{ display: 'flex', gap: '0.5rem' }}>
-              <input
-                type="text"
-                readOnly
-                value={magicLinkModal.url}
-                className="form-input"
-                style={{ fontSize: '0.8rem', background: '#0f172a' }}
-              />
-              <button
-                type="button"
-                onClick={() => copyToClipboard(magicLinkModal.url)}
-                className="btn btn-primary btn-sm"
-              >
-                Salin
-              </button>
+        {profileModal.loading || !profileModal.alumni ? (
+          <Spinner text="Memuat profil alumni..." />
+        ) : (
+          <>
+            <div className="alumni-profile-modal-header">
+              <div>
+                <h4>{profileModal.alumni.name}</h4>
+                <p>{profileModal.alumni.email || 'Email belum diisi'} · {profileModal.alumni.phone_number}</p>
+              </div>
+              {!profileModal.editing && (
+                <button type="button" className="btn btn-secondary btn-sm" onClick={() => setProfileModal((current) => ({ ...current, editing: true }))}>
+                  <Pencil size={14} /> Edit data
+                </button>
+              )}
             </div>
-          </div>
 
-          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem', marginTop: '1.5rem' }}>
-            <a
-              href={`https://wa.me/${magicLinkModal.alumni?.phone_number}?text=${encodeURIComponent(
-                `Halo ${magicLinkModal.alumni?.name}, berikut tautan masuk langsung untuk mengisi Tracer Study SMAN 1 Talang Padang: ${magicLinkModal.url}`
-              )}`}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="btn btn-primary"
-              style={{ background: '#25D366' }}
-            >
-              💬 Kirim via WhatsApp Web ↗
-            </a>
-            <button
-              type="button"
-              onClick={() => setMagicLinkModal({ open: false, url: '', alumni: null })}
-              className="btn btn-secondary"
-            >
-              Tutup
-            </button>
-          </div>
-        </div>
+            {profileModal.editing ? (
+              <form onSubmit={handleSaveProfile}>
+                <div className="alumni-profile-form-grid">
+                  <div className="form-group">
+                    <label className="form-label" htmlFor="alumni-name">Nama lengkap *</label>
+                    <input id="alumni-name" className="form-input" value={profileForm.name} onChange={(event) => updateProfileForm('name', event.target.value)} required maxLength={255} />
+                  </div>
+                  <div className="form-group">
+                    <label className="form-label" htmlFor="alumni-email">Email</label>
+                    <input id="alumni-email" type="email" className="form-input" value={profileForm.email} onChange={(event) => updateProfileForm('email', event.target.value)} maxLength={255} />
+                  </div>
+                  <div className="form-group">
+                    <label className="form-label" htmlFor="alumni-phone">Nomor WhatsApp *</label>
+                    <input id="alumni-phone" className="form-input" value={profileForm.phone_number} onChange={(event) => updateProfileForm('phone_number', event.target.value)} required maxLength={30} />
+                  </div>
+                  <div className="form-group">
+                    <label className="form-label" htmlFor="alumni-nisn">NISN *</label>
+                    <input id="alumni-nisn" className="form-input" inputMode="numeric" pattern="[0-9]{10}" maxLength={10} value={profileForm.nisn} onChange={(event) => updateProfileForm('nisn', event.target.value.replace(/\D/g, '').slice(0, 10))} required />
+                  </div>
+                  <div className="form-group">
+                    <label className="form-label" htmlFor="alumni-graduation-year">Tahun lulus *</label>
+                    <input id="alumni-graduation-year" type="number" min="2000" max="2099" className="form-input" value={profileForm.graduation_year} onChange={(event) => updateProfileForm('graduation_year', event.target.value)} required />
+                  </div>
+                  <div className="form-group">
+                    <label className="form-label" htmlFor="alumni-current-status">Status terkini *</label>
+                    <select id="alumni-current-status" className="form-input form-select" value={profileForm.current_status} onChange={(event) => updateProfileForm('current_status', event.target.value)} required>
+                      <option value="mahasiswa">Mahasiswa</option>
+                      <option value="gap_year">Gap Year</option>
+                      <option value="bekerja">Bekerja</option>
+                      <option value="wirausaha">Wirausaha</option>
+                      <option value="belum_kerja">Belum bekerja</option>
+                    </select>
+                  </div>
+                  <div className="form-group">
+                    <label className="form-label" htmlFor="alumni-campus">Perguruan tinggi</label>
+                    <input id="alumni-campus" className="form-input" value={profileForm.campus_name} onChange={(event) => updateProfileForm('campus_name', event.target.value)} maxLength={255} />
+                  </div>
+                  <div className="form-group">
+                    <label className="form-label" htmlFor="alumni-major">Program studi</label>
+                    <input id="alumni-major" className="form-input" value={profileForm.major_name} onChange={(event) => updateProfileForm('major_name', event.target.value)} maxLength={255} />
+                  </div>
+                  <div className="form-group">
+                    <label className="form-label" htmlFor="alumni-company">Perusahaan/instansi</label>
+                    <input id="alumni-company" className="form-input" value={profileForm.company_name} onChange={(event) => updateProfileForm('company_name', event.target.value)} maxLength={255} />
+                  </div>
+                  <div className="form-group">
+                    <label className="form-label" htmlFor="alumni-job-title">Jabatan</label>
+                    <input id="alumni-job-title" className="form-input" value={profileForm.job_title} onChange={(event) => updateProfileForm('job_title', event.target.value)} maxLength={255} />
+                  </div>
+                </div>
+                <label className="form-checkbox-item" style={{ marginBottom: '1rem' }}>
+                  <input type="checkbox" checked={profileForm.is_wa_active} onChange={(event) => updateProfileForm('is_wa_active', event.target.checked)} />
+                  <span>Notifikasi WhatsApp sekolah aktif</span>
+                </label>
+                <div className="alumni-profile-form-actions">
+                  <button type="button" className="btn btn-secondary" onClick={() => openProfile(profileModal.alumni)}>Batal</button>
+                  <button type="submit" className="btn btn-primary" disabled={savingProfile}>
+                    <Save size={15} /> {savingProfile ? 'Menyimpan...' : 'Simpan perubahan'}
+                  </button>
+                </div>
+              </form>
+            ) : (
+              <>
+                <div className="alumni-profile-facts">
+                  <div><span>Email</span><strong>{profileModal.alumni.email || '-'}</strong></div>
+                  <div><span>Nomor WhatsApp</span><strong>{profileModal.alumni.phone_number}</strong></div>
+                  <div><span>NISN</span><strong>{profileForm?.nisn || '-'}</strong></div>
+                  <div><span>Tahun lulus</span><strong>{profileForm?.graduation_year || '-'}</strong></div>
+                  <div><span>Status</span><strong>{profileForm?.current_status?.replaceAll('_', ' ') || '-'}</strong></div>
+                  <div><span>Notifikasi WA</span><strong>{profileModal.alumni.is_wa_active ? 'Aktif' : 'Nonaktif'}</strong></div>
+                  <div><span>Perguruan tinggi</span><strong>{profileForm?.campus_name || '-'}</strong></div>
+                  <div><span>Program studi</span><strong>{profileForm?.major_name || '-'}</strong></div>
+                  <div><span>Perusahaan/instansi</span><strong>{profileForm?.company_name || '-'}</strong></div>
+                  <div><span>Jabatan</span><strong>{profileForm?.job_title || '-'}</strong></div>
+                </div>
+                <h4 className="alumni-answers-heading">Jawaban Tracer Study</h4>
+                {profileModal.alumni.tracer_answers?.length ? (
+                  <div className="alumni-answers-list">
+                    {profileModal.alumni.tracer_answers.map((answer) => (
+                      <div key={answer.id}>
+                        <span>{answer.question?.question_text || 'Pertanyaan tidak tersedia'}</span>
+                        <strong>{typeof answer.answer_value === 'string' ? answer.answer_value : JSON.stringify(answer.answer_value)}</strong>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="alumni-no-answers">Alumni ini belum mengirim jawaban tracer study.</p>
+                )}
+              </>
+            )}
+          </>
+        )}
       </Modal>
     </div>
   );

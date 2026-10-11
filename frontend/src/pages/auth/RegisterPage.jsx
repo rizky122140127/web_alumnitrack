@@ -1,16 +1,20 @@
 import React, { useState } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
+import { useNavigate, Link, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import { useToast } from '../../contexts/ToastContext';
+import AuthBrand from '../../components/auth/AuthBrand';
+import GoogleAuthButton from '../../components/auth/GoogleAuthButton';
+import SchoolFooter from '../../components/SchoolFooter';
 
 const RegisterPage = () => {
+  const [searchParams] = useSearchParams();
+  const googleCode = searchParams.get('google_code');
   const [formData, setFormData] = useState({
-    name: '',
-    email: '',
+    name: searchParams.get('name') || (searchParams.get('google_code') ? 'Alumni' : ''),
+    email: searchParams.get('email') || '',
     phone_number: '',
     password: '',
     password_confirmation: '',
-    role: 'alumni',
     nisn: '',
     graduation_year: new Date().getFullYear(),
     current_status: 'mahasiswa',
@@ -18,7 +22,7 @@ const RegisterPage = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
-  const { register } = useAuth();
+  const { register, registerWithGoogle } = useAuth();
   const toast = useToast();
   const navigate = useNavigate();
 
@@ -33,12 +37,12 @@ const RegisterPage = () => {
     e.preventDefault();
     setError('');
 
-    if (formData.password !== formData.password_confirmation) {
+    if (!googleCode && formData.password !== formData.password_confirmation) {
       setError('Konfirmasi password tidak cocok.');
       return;
     }
 
-    if (formData.role === 'alumni' && formData.nisn.length !== 10) {
+    if (formData.nisn.length !== 10) {
       setError('NISN harus 10 digit angka.');
       return;
     }
@@ -46,22 +50,37 @@ const RegisterPage = () => {
     setLoading(true);
 
     try {
+      if (googleCode) {
+        await registerWithGoogle({
+          code: googleCode,
+          phone_number: formData.phone_number,
+          nisn: formData.nisn,
+          graduation_year: parseInt(formData.graduation_year, 10),
+          current_status: formData.current_status,
+        });
+        toast.info('Pendaftaran Google berhasil dikirim dan menunggu verifikasi admin.');
+        navigate('/auth/login');
+        return;
+      }
+
       const payload = {
         name: formData.name,
         email: formData.email || null,
         phone_number: formData.phone_number,
         password: formData.password,
         password_confirmation: formData.password_confirmation,
-        role: formData.role,
+        current_status: formData.current_status,
       };
 
-      if (formData.role === 'alumni') {
-        payload.nisn = formData.nisn;
-        payload.graduation_year = parseInt(formData.graduation_year);
-        payload.current_status = formData.current_status;
-      }
+      payload.nisn = formData.nisn;
+      payload.graduation_year = parseInt(formData.graduation_year, 10);
 
-      const user = await register(payload);
+      const { user, approvalStatus } = await register(payload);
+      if (approvalStatus === 'pending') {
+        toast.info('Pendaftaran berhasil dikirim. Akun dapat digunakan setelah diverifikasi admin.');
+        navigate('/auth/login');
+        return;
+      }
       toast.success('Pendaftaran akun berhasil! Selamat datang.');
       if (user.role === 'admin') {
         navigate('/admin/dashboard');
@@ -82,26 +101,25 @@ const RegisterPage = () => {
   };
 
   return (
-    <div className="login-container" style={{ minHeight: '100vh', padding: '2rem 1rem' }}>
-      <div className="login-card" style={{ maxWidth: '520px' }}>
+    <div className="auth-shell">
+      <div className="auth-page auth-page-register">
+        <AuthBrand />
+        <section className="auth-panel">
+        <div className="auth-mobile-heading">
+          <div className="auth-brand-mark">
+            <img src="/logo-sman1-talang-padang.png" alt="Logo SMAN 1 Talang Padang" />
+          </div>
+          <span>AlumniTracker</span>
+        </div>
+        <div className="login-card">
         <div className="login-logo">
-          <div style={{ fontSize: '2.5rem', marginBottom: '0.5rem' }}>🎓</div>
-          <h1>Daftar Akun Baru</h1>
-          <p>Sistem Alumni Tracker SMAN 1 Talang Padang</p>
+          <span className="auth-eyebrow">{googleCode ? 'PENDAFTARAN ALUMNI' : 'BERGABUNG DENGAN ALUMNITRACKER'}</span>
+          <h1>{googleCode ? 'Lengkapi data alumni' : 'Buat akun alumni'}</h1>
+          <p>{googleCode ? 'Lengkapi data sebagai alumni yang telah lulus agar pendaftaran dapat diverifikasi.' : 'Pendaftaran ini khusus alumni yang telah lulus dan perlu diverifikasi oleh admin.'}</p>
         </div>
 
         {error && (
-          <div
-            style={{
-              background: 'rgba(239, 68, 68, 0.15)',
-              border: '1px solid #ef4444',
-              borderRadius: '0.5rem',
-              padding: '0.75rem',
-              color: '#fca5a5',
-              fontSize: '0.875rem',
-              marginBottom: '1.25rem',
-            }}
-          >
+          <div className="login-error">
             {error}
           </div>
         )}
@@ -116,11 +134,12 @@ const RegisterPage = () => {
               placeholder="Contoh: Budi Santoso"
               value={formData.name}
               onChange={handleChange}
+              readOnly={Boolean(googleCode)}
               required
             />
           </div>
 
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+          <div className="auth-form-grid">
             <div className="form-group">
               <label className="form-label">No. WhatsApp *</label>
               <input
@@ -143,18 +162,19 @@ const RegisterPage = () => {
                 placeholder="alumni@email.com"
                 value={formData.email}
                 onChange={handleChange}
+                readOnly={Boolean(googleCode)}
               />
             </div>
           </div>
 
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+          {!googleCode && <div className="auth-form-grid">
             <div className="form-group">
               <label className="form-label">Password *</label>
               <input
                 type="password"
                 name="password"
                 className="form-input"
-                placeholder="Minimal 6 karakter"
+                placeholder="Minimal 8 karakter"
                 value={formData.password}
                 onChange={handleChange}
                 required
@@ -173,74 +193,57 @@ const RegisterPage = () => {
                 required
               />
             </div>
-          </div>
+          </div>}
 
-          <div className="form-group">
-            <label className="form-label">Status Registrasi</label>
-            <select
-              name="role"
-              className="form-input form-select"
-              value={formData.role}
-              onChange={handleChange}
-            >
-              <option value="alumni">Alumni SMAN 1 Talang Padang</option>
-              <option value="siswa">Siswa Aktif</option>
-            </select>
-          </div>
+          <div className="auth-alumni-fields">
+            <div>Data Alumni</div>
 
-          {formData.role === 'alumni' && (
-            <div style={{ background: 'rgba(15, 23, 42, 0.4)', padding: '1rem', borderRadius: '0.75rem', marginBottom: '1.25rem', border: '1px solid #334155' }}>
-              <div style={{ fontSize: '0.85rem', fontWeight: 600, color: '#818cf8', marginBottom: '0.75rem' }}>
-                Data Profil Alumni
-              </div>
-
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
-                <div className="form-group" style={{ marginBottom: '0.5rem' }}>
-                  <label className="form-label">NISN (10 Digit) *</label>
-                  <input
-                    type="text"
-                    name="nisn"
-                    maxLength={10}
-                    className="form-input"
-                    placeholder="0012345678"
-                    value={formData.nisn}
-                    onChange={handleChange}
-                    required={formData.role === 'alumni'}
-                  />
-                </div>
-
-                <div className="form-group" style={{ marginBottom: '0.5rem' }}>
-                  <label className="form-label">Tahun Kelulusan *</label>
-                  <input
-                    type="number"
-                    name="graduation_year"
-                    className="form-input"
-                    min="2000"
-                    max="2030"
-                    value={formData.graduation_year}
-                    onChange={handleChange}
-                    required={formData.role === 'alumni'}
-                  />
-                </div>
-              </div>
-
-              <div className="form-group" style={{ marginTop: '0.5rem', marginBottom: 0 }}>
-                <label className="form-label">Aktivitas Saat Ini</label>
-                <select
-                  name="current_status"
-                  className="form-input form-select"
-                  value={formData.current_status}
+            <div className="auth-form-grid">
+              <div className="form-group">
+                <label className="form-label">NISN (10 Digit) *</label>
+                <input
+                  type="text"
+                  name="nisn"
+                  maxLength={10}
+                  className="form-input"
+                  placeholder="0012345678"
+                  value={formData.nisn}
                   onChange={handleChange}
-                >
-                  <option value="mahasiswa">Melanjutkan Kuliah (Mahasiswa)</option>
-                  <option value="bekerja">Bekerja</option>
-                  <option value="wirausaha">Wirausaha / Bisnis</option>
-                  <option value="gap_year">Gap Year / Persiapan</option>
-                  <option value="belum_kerja">Belum Bekerja</option>
-                </select>
+                  required
+                />
+              </div>
+
+              <div className="form-group">
+                <label className="form-label">Tahun Kelulusan *</label>
+                <input
+                  type="number"
+                  name="graduation_year"
+                  className="form-input"
+                  min="2000"
+                  max="2030"
+                  value={formData.graduation_year}
+                  onChange={handleChange}
+                  required
+                />
               </div>
             </div>
-          )}
+
+            <div className="form-group" style={{ marginBottom: 0 }}>
+              <label className="form-label">Aktivitas Saat Ini</label>
+              <select
+                name="current_status"
+                className="form-input form-select"
+                value={formData.current_status}
+                onChange={handleChange}
+              >
+                <option value="mahasiswa">Melanjutkan Kuliah (Mahasiswa)</option>
+                <option value="bekerja">Bekerja</option>
+                <option value="wirausaha">Wirausaha / Bisnis</option>
+                <option value="gap_year">Gap Year / Persiapan</option>
+                <option value="belum_kerja">Belum Bekerja</option>
+              </select>
+            </div>
+          </div>
 
           <button
             type="submit"
@@ -252,12 +255,20 @@ const RegisterPage = () => {
           </button>
         </form>
 
-        <div style={{ textAlign: 'center', marginTop: '1.5rem', fontSize: '0.875rem', color: '#94a3b8' }}>
+        {!googleCode && <>
+        <div className="auth-divider"><span>atau daftar dengan</span></div>
+        <GoogleAuthButton>Daftar dengan Google</GoogleAuthButton>
+        </>}
+
+        <div className="login-register-link">
           Sudah punya akun?{' '}
-          <Link to="/auth/login" style={{ color: '#818cf8', fontWeight: 600 }}>
+          <Link to="/auth/login">
             Masuk ke Akun Anda
           </Link>
         </div>
+      </div>
+        </section>
+        <SchoolFooter />
       </div>
     </div>
   );

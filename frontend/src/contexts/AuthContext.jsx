@@ -47,8 +47,8 @@ export const AuthProvider = ({ children }) => {
     return receivedUser;
   };
 
-  const loginWithMagicLink = async (magicToken) => {
-    const res = await api.post('/auth/magic-link', { token: magicToken });
+  const loginWithGoogleCode = async (code) => {
+    const res = await api.post('/auth/google/exchange', { code });
     const { token: receivedToken, user: receivedUser } = res.data;
 
     setToken(receivedToken);
@@ -57,23 +57,29 @@ export const AuthProvider = ({ children }) => {
     localStorage.setItem('user', JSON.stringify(receivedUser));
 
     return receivedUser;
+  };
+
+  const registerWithGoogle = async (registrationData) => {
+    return api.post('/auth/google/register', registrationData).then((res) => res.data);
   };
 
   const register = async (userData) => {
     const res = await api.post('/auth/register', userData);
     const { token: receivedToken, user: receivedUser } = res.data;
 
-    setToken(receivedToken);
-    setUser(receivedUser);
-    localStorage.setItem('token', receivedToken);
-    localStorage.setItem('user', JSON.stringify(receivedUser));
+    if (receivedToken) {
+      setToken(receivedToken);
+      setUser(receivedUser);
+      localStorage.setItem('token', receivedToken);
+      localStorage.setItem('user', JSON.stringify(receivedUser));
+    }
 
-    return receivedUser;
+    return { user: receivedUser, approvalStatus: res.data.approval_status };
   };
 
   const logout = async () => {
     try {
-      if (token) {
+      if (localStorage.getItem('token')) {
         await api.post('/auth/logout');
       }
     } catch (err) {
@@ -100,11 +106,11 @@ export const AuthProvider = ({ children }) => {
     role: user?.role || null,
     isAdmin: user?.role === 'admin',
     isAlumni: user?.role === 'alumni',
-    isSiswa: user?.role === 'siswa',
     loading,
     login,
-    loginWithMagicLink,
+    loginWithGoogleCode,
     register,
+    registerWithGoogle,
     logout,
     updateProfile,
     setUser,

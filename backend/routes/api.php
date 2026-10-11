@@ -1,13 +1,17 @@
 <?php
 
 use App\Http\Controllers\AccreditationRekapController;
+use App\Http\Controllers\AdminUserController;
 use App\Http\Controllers\AlumniController;
+use App\Http\Controllers\AlumniRegistrationController;
 use App\Http\Controllers\Auth\AuthController;
+use App\Http\Controllers\Auth\GoogleAuthController;
 use App\Http\Controllers\CareerPostController;
 use App\Http\Controllers\TracerAnswerController;
 use App\Http\Controllers\TracerQuestionController;
 use App\Http\Controllers\WaNotificationController;
 use App\Http\Middleware\EnsureIsAdmin;
+use App\Http\Middleware\EnsureIsPortalUser;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -21,12 +25,14 @@ use Illuminate\Support\Facades\Route;
 Route::prefix('auth')->group(function () {
     Route::post('/register', [AuthController::class, 'register']);
     Route::post('/login', [AuthController::class, 'login']);
-    Route::post('/magic-link', [AuthController::class, 'validateMagicLink']);
+    Route::post('/google/exchange', [GoogleAuthController::class, 'exchange']);
+    Route::post('/google/register', [GoogleAuthController::class, 'register']);
 });
+Route::get('/public/events', [CareerPostController::class, 'publicEvents']);
 
 // ── Authenticated Routes ──────────────────────────────────────────────
 
-Route::middleware('auth:sanctum')->group(function () {
+Route::middleware(['auth:sanctum', EnsureIsPortalUser::class])->group(function () {
 
     // Auth
     Route::get('/profile', [AuthController::class, 'profile']);
@@ -52,9 +58,12 @@ Route::middleware('auth:sanctum')->group(function () {
 
         // Alumni Directory (Admin)
         Route::get('/alumni', [AlumniController::class, 'index']);
-
-        // Magic Link generation
-        Route::post('/auth/generate-magic-link', [AuthController::class, 'generateMagicLink']);
+        Route::get('/alumni/{user}', [AlumniController::class, 'show']);
+        Route::put('/alumni/{user}', [AlumniController::class, 'update']);
+        Route::get('/admin-users', [AdminUserController::class, 'index']);
+        Route::post('/admin-users', [AdminUserController::class, 'store']);
+        Route::get('/alumni-registrations', [AlumniRegistrationController::class, 'index']);
+        Route::patch('/alumni-registrations/{user}', [AlumniRegistrationController::class, 'update']);
 
         // Tracer Questions CRUD (Admin)
         Route::post('/tracer-questions', [TracerQuestionController::class, 'store']);
@@ -71,5 +80,7 @@ Route::middleware('auth:sanctum')->group(function () {
         // WA Notifications
         Route::get('/wa-notifications', [WaNotificationController::class, 'index']);
         Route::get('/wa-notifications/stats', [WaNotificationController::class, 'stats']);
+        Route::post('/wa-notifications/send-tracer-reminders', [WaNotificationController::class, 'sendTracerReminders']);
+        Route::post('/wa-notifications/send-targeted', [WaNotificationController::class, 'sendTargetedBroadcast']);
     });
 });
